@@ -1,0 +1,163 @@
+# =============================================================================
+# Git Aliases Collection
+# Reference: https://github.com/jy7123943/git-alias
+# =============================================================================
+# Requirements:
+#   fzf      - interactive fuzzy finder (used by selector aliases)
+#   pygments - syntax highlighting for diff previews
+#
+#   macOS:  brew install fzf pygments
+#   Linux:  apt install fzf python3-pygments  (Debian/Ubuntu)
+#           yum install fzf python3-pygments  (RHEL/CentOS)
+# =============================================================================
+
+[alias]
+
+    # ── View / Info ───────────────────────────────────────────────────────────
+
+    alias = "!git config --list | grep -E '^alias\\.' | sed 's/^alias\\.//' | column -t -s'='"
+    aliases = "!git config --list | grep -E '^alias\\.' | cut -c 7-"
+    l = log --all --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr)%C(bold blue)<%an>%Creset' --abbrev-commit
+    s = status
+    ss = status -s
+    br = branch
+    co = checkout
+    b0 = "!git symbolic-ref --short HEAD"
+    main-or-master = "!if git show-ref --quiet refs/heads/master; then echo master; else echo main; fi"
+    branch-list = "!git for-each-ref --sort=-committerdate refs/heads --format='%(HEAD) %(refname:strip=2) | %(committerdate:relative) | %(authorname)' | column -ts'|' | sed 's/^ /./'"
+    b-l = "!git branch-list"
+    remote-branch = "!git remote show"
+    repo = "!basename $(git rev-parse --show-toplevel)"
+    reflog-date = "!git reflog --relative-date"
+    rf-d = "!git reflog-date"
+    stash-list = "!git stash list --pretty=format:\"%C(red)%gd%C(reset) %C(green)(%cr) %C(reset)%s\""
+    s-l = "!git stash-list"
+
+    # ── fzf Selectors ─────────────────────────────────────────────────────────
+
+    alias-select = "!f() { git aliases | fzf --reverse | awk -F= '{print $1}'; }; f"
+    exe = "!git $(git alias-select)"
+    diff-select = "!f() { _h=$(stty size | awk '{print $1}'); git ss | fzf -m --preview \"git diff {2} | head -n $_h | pygmentize\" --color 'preview-bg:#334455' | awk '{print $2}'; }; f"
+    branch-select = "!f() { _h=$(stty size | awk '{print $1}'); git branch | grep -v '^\\*' | fzf --preview \"git l {1} | head -n $_h\"; }; f"
+    branch-select-all = "!f() { _h=$(stty size | awk '{print $1}'); git branch -a | grep -v '^\\*' | fzf --preview \"git l {1} | head -n $_h\"; }; f"
+    unmerged-branch-select = "!f() { MHASH=$(git rev-parse --short --verify origin/$(git main-or-master)); _h=$(stty size | awk '{print $1}'); git branch --no-contains $MHASH --no-merged $MHASH | grep -v '^\\*' | fzf --preview \"git l {1} | head -n $_h\"; }; f"
+    stash-select = "!f() { git stash-list | fzf --ansi --layout=reverse --preview \"git stash show -p {1} --color=always\" | cut -d' ' -f1; }; f"
+    reflog-select = "!git reflog | fzf -m --ansi --layout=reverse --preview=\"echo {} | sed 's/^[*| ]*//g' | cut -d' ' -f1 | xargs git show --color=always\" | sed 's/^[*| ]*//g' | cut -d' ' -f1"
+    commit-select = "!git l | fzf -m --ansi --layout=reverse --preview=\"echo {} | sed 's/^[*| ]*//g' | cut -d' ' -f1 | xargs git show --color=always\" | sed 's/^[*| ]*//g' | cut -d' ' -f1"
+    commit-select-m = "!git l | fzf -m --ansi --layout=reverse --preview=\"echo {} | sed 's/^[*| ]*//g' | cut -d' ' -f1 | xargs git show --color=always\" | sed 's/^[*| ]*//g' | cut -d' ' -f1"
+    c-s = "!git commit-select"
+
+    # ── Add / Stage ───────────────────────────────────────────────────────────
+
+    a = "!git add $(git diff-select)"
+    aa = "!git add ."
+    unstage = "!git reset HEAD $(git status -s | fzf -m | awk '{print $2}')"
+    uns = "!git unstage"
+    unstage-a = "!git reset HEAD ."
+    uns-a = "!git unstage-a"
+
+    # ── Discard / Restore ─────────────────────────────────────────────────────
+
+    d-a = "!git checkout -- $(git status -s | fzf -m | awk '{print $2}')"
+    d-aa = "!git checkout -- ."
+
+    # ── Commit ────────────────────────────────────────────────────────────────
+
+    ci = "!git commit -m"
+    ci-amend = "!git commit --amend -m"
+    ci-a = "!git ci-amend"
+    ci-no-edit = "!git commit --amend --no-edit"
+    ci-ne = "!git ci-no-edit"
+    aa-c = "!git aa; git ci"
+    a-c = "!git add $(git diff-select); read -p 'commit message: ' MSG; git ci \"$MSG\""
+    aa-cp = "!git aa; read -p 'commit message: ' MSG; git ci \"$MSG\"; git p"
+
+    # ── Checkout / Branch ─────────────────────────────────────────────────────
+
+    ch = "!git checkout $(git branch-select)"
+    ch-m = "!git checkout $(git main-or-master)"
+    ch-n = "!git checkout -b"
+    ch-nc = "!read -p 'branch name: ' BNAME; git branch \"$BNAME\" $(git commit-select); git checkout \"$BNAME\""
+    back = "!git branch backup-$(git b0)"
+    ch-back = "!git checkout -b backup-$(git b0)"
+
+    # ── Branch Management ─────────────────────────────────────────────────────
+
+    d-b = "!git branch -D $(git branch-select)"
+    d-bt = "!git branch -D"
+    d-b0 = "!CURR=$(git b0); git ch-m; git d-bt $CURR"
+    rename-branch = "!git branch -m $(git b0)"
+    rename = "!git rename-branch"
+    clean-branch = "!git branch -d $(git branch --merged | grep -v '^\\*\\|main\\|master')"
+    c-b = "!git clean-branch"
+    clean-unmerged = "!git fetch; MHASH=$(git rev-parse --short --verify $(git main-or-master)); git ch-m; git branch --no-contains $MHASH --no-merged $MHASH | grep -v '^\\*\\|main\\|master' | xargs git branch -D"
+    c-ub = "!git clean-unmerged"
+    track-all-remote-branch = "!for i in $(git branch -a | grep remote | grep -v HEAD | grep -v $(git main-or-master)); do git branch --track ${i#remotes/origin/} $i 2>/dev/null; done"
+    t-a = "!git track-all-remote-branch"
+    u-b = "!git ch-m; git pl; git f; git t-a"
+
+    # ── Push / Pull / Fetch ───────────────────────────────────────────────────
+
+    p = "!git push $(git remote-branch) $(git b0)"
+    p-f = "!git push $(git remote-branch) $(git b0) --force-with-lease"
+    pl = "!git pull $(git remote-branch) $(git b0)"
+    pl-m = "!git ch-m; git pl"
+    pp = "!git pl; git p"
+    f = "!git fetch"
+    f-p = "!git fetch --prune"
+
+    # ── Stash ─────────────────────────────────────────────────────────────────
+
+    s-p = "!git stash pop"
+    stash-save = "!git aa; git stash save"
+    s-s = "!git stash-save"
+    stash-op = "!f() { git stash-select | xargs git stash $1; }; f"
+    stash-apply = "!git stash-op apply"
+    s-a = "!git stash-apply"
+    stash-drop = "!git stash-op drop"
+    s-d = "!git stash-drop"
+    stash-clear = "!git stash clear"
+    s-c = "!git stash-clear"
+
+    # ── Rebase ────────────────────────────────────────────────────────────────
+
+    rebase-from = "!BRANCH=$(git symbolic-ref --short HEAD); git ch-m; git pl; git co $BRANCH; git rebase --onto $(git main-or-master) $(git commit-select)^"
+    rb-f = "!git rebase-from"
+    rebase-master = "!BRANCH=$(git symbolic-ref --short HEAD); git ch-m; git pl; git co $BRANCH; git rebase $(git main-or-master)"
+    rb-m = "!git rebase-master"
+    rebase-branch = "!BRANCH=$(git symbolic-ref --short HEAD); RBRANCH=$(git branch-select); git co $RBRANCH; git pl; git co $BRANCH; git rebase $RBRANCH"
+    rb-b = "!git rebase-branch"
+    rebase-continue = "!git rebase --continue"
+    rb-c = "!git rebase-continue"
+    rebase-skip = "!git rebase --skip"
+    rb-s = "!git rebase-skip"
+    rebase-abort = "!git rebase --abort"
+    rb-a = "!git rebase-abort"
+
+    # ── Reset / Revert ────────────────────────────────────────────────────────
+
+    reset-reflog = "!git reset --hard $(git reflog-select)"
+    rs-r = "!git reset-reflog"
+    revert-commit = "!git revert $(git commit-select)"
+    rv = "!git revert-commit"
+    drop = "!git rebase -i $(git commit-select)^"
+    reset-hard = "!git reset --hard $(git commit-select-m)"
+    rs-h = "!git reset-hard"
+    reset-soft = "!git reset --soft $(git commit-select-m)"
+    rs-s = "!git reset-soft"
+    reset-mixed = "!git reset --mixed $(git commit-select-m)"
+    rs = "!git reset-mixed"
+
+    # ── Cherry-pick ───────────────────────────────────────────────────────────
+
+    cherrypick = "!git cherry-pick $(git commit-select)"
+    cp = "!git cherrypick"
+    cherrypick-m = "!git cherry-pick $(git commit-select)^..$(git commit-select)"
+    cp-m = "!git cherrypick-m"
+    cp-b = "!git ch-nc; git cp-m"
+
+    # ── Deploy / Misc (macOS pbcopy) ──────────────────────────────────────────
+
+    o = "!git open"
+    dp = "!echo @deploybot deploy $(git repo) staging $(git rev-parse --short HEAD) | pbcopy && echo Copied: $(pbpaste)"
+    dp-p = "!echo @deploybot deploy $(git repo) production $(git rev-parse --short HEAD) | pbcopy && echo Copied: $(pbpaste)"
